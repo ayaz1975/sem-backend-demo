@@ -1,0 +1,10 @@
+{
+  "name": "client-demo-worker",
+  "version": "1.0.0",
+  "main": "src/worker.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/worker.js"
+  }
+}
+

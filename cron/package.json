@@ -1,0 +1,10 @@
+{
+  "name": "client-demo-cron",
+  "version": "1.0.0",
+  "main": "src/cron.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/cron.js"
+  }
+}
+
