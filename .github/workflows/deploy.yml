@@ -1,0 +1,66 @@
+name: Deploy SEM (API + Worker + Cron)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: "636851749897.dkr.ecr.eu-north-1.amazonaws.com"
+
+  # ✅ SEM cluster/services from Terraform
+  ECS_CLUSTER: "sem-backend-cluster"
+  ECS_SERVICE_API: "sem-backend-api-service"
+  ECS_SERVICE_WORKER: "sem-backend-worker-service"
+
+  # ✅ SEM ECR repos from Terraform
+  ECR_REPO_API: "sem-backend-api"
+  ECR_REPO_WORKER: "sem-backend-worker"
+  ECR_REPO_CRON: "sem-backend-cron"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push API (linux/amd64)
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPO_API:latest \
+            -f api/Dockerfile api \
+            --push
+
+      - name: Build & Push WORKER (linux/amd64)
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPO_WORKER:latest \
+            -f worker/Dockerfile worker \
+            --push
+
+      - name: Build & Push CRON (linux/amd64)
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPO_CRON:latest \
+            -f cron/Dockerfile cron \
+            --push
+
+      - name: Force new deployment (API + WORKER)
+        run: |
+          aws ecs update-service --region "$AWS_REGION" --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE_API" --force-new-deployment
+          aws ecs update-service --region "$AWS_REGION" --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE_WORKER" --force-new-deployment
